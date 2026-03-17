@@ -144,8 +144,24 @@ const App: React.FC = () => {
   const activeCount = loans.filter(l => l.status === 'Active').length;
   const overdueCount = loans.filter(l => l.status === 'Overdue' || l.status === 'Defaulter').length;
 
+  // Security Verification
+  const verifySecurityAction = () => {
+    const savedPin = localStorage.getItem('appPin');
+    if (!savedPin) {
+      alert('Security Error: Please setup an App PIN in Settings before performing this action.');
+      setActiveTab('settings');
+      return false;
+    }
+    const input = window.prompt('Enter your 4-digit security PIN to confirm:');
+    if (input === savedPin) return true;
+    
+    alert('Incorrect PIN. Security check failed.');
+    return false;
+  };
+
   // Handlers
   const addLoan = (loan: Omit<Loan, 'id'>) => {
+    if (!verifySecurityAction()) return;
     const newLoan = { ...loan, id: Date.now().toString() };
     setLoans([...loans, newLoan]);
     setActiveTab('dashboard');
@@ -168,6 +184,7 @@ const App: React.FC = () => {
 
   const deleteLoan = (id: string) => {
     if (window.confirm('Are you sure you want to delete this loan?')) {
+      if (!verifySecurityAction()) return;
       setLoans(loans.filter(l => l.id !== id));
       setPayments(payments.filter(p => p.loanId !== id));
       setActiveTab('loans');
