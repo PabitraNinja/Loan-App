@@ -1,10 +1,21 @@
+export type Role = 'ADMIN' | 'PROVIDER' | 'TAKER';
 export type LoanStatus = 'Active' | 'Completed' | 'Overdue' | 'Defaulter';
 export type PaymentType = 'Interest' | 'Principal';
 
-export interface Loan {
+export interface User {
   id: string;
   name: string;
-  phone: string;
+  email: string;
+  role: Role;
+  status: 'Active' | 'Inactive';
+}
+
+export interface Loan {
+  id: string;
+  providerId: string;
+  takerId: string;
+  name: string; // Taker Name (legacy support)
+  phone: string; // Taker Phone (legacy support)
   amount: number;
   rate: number;
   startDate: string;

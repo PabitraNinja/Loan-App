@@ -16,23 +16,25 @@ import {
   Bell,
   Trash2,
   Lock,
-  Download
+  Download,
+  ShieldAlert,
+  UserCheck
 } from 'lucide-react';
-import { Loan, Payment, LoanStatus, PaymentType } from './types';
+import { Loan, Payment, LoanStatus, PaymentType, Role, User } from './types';
 import './App.css';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return !localStorage.getItem('appPin');
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('currentUser');
+    return saved ? JSON.parse(saved) : null;
   });
-  const [pinInput, setPinInput] = useState('');
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loans, setLoans] = useState<Loan[]>(() => {
     const saved = localStorage.getItem('loans');
     return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'John Doe', phone: '123-456-7890', amount: 50000, rate: 2, startDate: '2023-10-01', type: 'Simple', cycle: 'Monthly', status: 'Active', notes: '' },
-      { id: '2', name: 'Sarah Smith', phone: '987-654-3210', amount: 25000, rate: 3, startDate: '2023-11-15', type: 'Simple', cycle: 'Monthly', status: 'Overdue', notes: '' },
+      { id: '1', providerId: 'prov-1', takerId: 'tak-1', name: 'John Doe', phone: '123-456-7890', amount: 50000, rate: 2, startDate: '2023-10-01', type: 'Simple', cycle: 'Monthly', status: 'Active', notes: '' },
+      { id: '2', providerId: 'prov-1', takerId: 'tak-2', name: 'Sarah Smith', phone: '987-654-3210', amount: 25000, rate: 3, startDate: '2023-11-15', type: 'Simple', cycle: 'Monthly', status: 'Overdue', notes: '' },
     ];
   });
   
@@ -56,22 +58,28 @@ const App: React.FC = () => {
     localStorage.setItem('payments', JSON.stringify(payments));
   }, [payments]);
 
-  // Auth Handling
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const savedPin = localStorage.getItem('appPin');
-    if (savedPin === pinInput) {
-      setIsAuthenticated(true);
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
     } else {
-      alert('Incorrect PIN');
+      localStorage.removeItem('currentUser');
     }
+  }, [currentUser]);
+
+  // Auth Handling
+  const mockLogin = (role: Role) => {
+    let mockUser: User;
+    if (role === 'ADMIN') mockUser = { id: 'admin-1', name: 'Super Admin', email: 'admin@system.com', role: 'ADMIN', status: 'Active' };
+    else if (role === 'PROVIDER') mockUser = { id: 'prov-1', name: 'Lender Pro', email: 'lender@system.com', role: 'PROVIDER', status: 'Active' };
+    else mockUser = { id: 'tak-1', name: 'John Doe', email: 'john@system.com', role: 'TAKER', status: 'Active' };
+    
+    setCurrentUser(mockUser);
+    setActiveTab('dashboard');
   };
 
-  const setupPin = () => {
-    const newPin = window.prompt('Enter a 4-digit PIN to lock the app:');
-    if (newPin && newPin.length >= 4) {
-      localStorage.setItem('appPin', newPin);
-      alert('PIN setup successful. App will lock on next reload.');
+  const handleLogout = () => {
+    if(window.confirm('Are you sure you want to log out?')) {
+      setCurrentUser(null);
     }
   };
 
@@ -99,7 +107,6 @@ const App: React.FC = () => {
     const diffTime = Math.max(0, today.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // Pro-rata interest based on monthly rate (30 days = 1 month)
     const monthlyRate = loan.rate / 100;
     const dailyRate = monthlyRate / 30;
     
@@ -107,7 +114,6 @@ const App: React.FC = () => {
     if (loan.type === 'Simple') {
       accrued = loan.amount * dailyRate * diffDays;
     } else {
-      // Compound Interest (Daily compounding simulation)
       accrued = loan.amount * (Math.pow(1 + dailyRate, diffDays) - 1);
     }
     return Math.round(accrued);
@@ -131,27 +137,27 @@ const App: React.FC = () => {
     };
   };
 
-  // Derived Stats
-  const activeLoans = loans.filter(l => l.status !== 'Completed');
+  // Derived Stats based on Context
+  let contextualLoans = loans;
+  if (currentUser?.role === 'PROVIDER') contextualLoans = loans.filter(l => l.providerId === currentUser.id);
+  if (currentUser?.role === 'TAKER') contextualLoans = loans.filter(l => l.takerId === currentUser.id);
+
+  const activeLoans = contextualLoans.filter(l => l.status !== 'Completed');
   const totalGiven = activeLoans.reduce((acc, l) => acc + l.amount, 0);
   
-  // Calculate real-time profit (Total Accrued - Interest Payments) is not right for dashboard.
-  // Dashboard Profit = Current Accrued Interest on all active loans
   const totalAccruedProfit = activeLoans.reduce((acc, l) => acc + getAccruedInterest(l), 0);
   const monthlyProfit = activeLoans.reduce((acc, l) => acc + (l.amount * l.rate / 100), 0);
-  const totalInterestPaid = payments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
   
-  const activeCount = loans.filter(l => l.status === 'Active').length;
-  const overdueCount = loans.filter(l => l.status === 'Overdue' || l.status === 'Defaulter').length;
+  const contextualPayments = payments.filter(p => contextualLoans.some(l => l.id === p.loanId));
+  const totalInterestPaid = contextualPayments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
+  
+  const activeCount = contextualLoans.filter(l => l.status === 'Active').length;
+  const overdueCount = contextualLoans.filter(l => l.status === 'Overdue' || l.status === 'Defaulter').length;
 
-  // Security Verification
+  // Security Verification (Mocked for Prototype)
   const verifySecurityAction = () => {
     const savedPin = localStorage.getItem('appPin');
-    if (!savedPin) {
-      alert('Security Error: Please setup an App PIN in Settings before performing this action.');
-      setActiveTab('settings');
-      return false;
-    }
+    if (!savedPin) return true; // Disabled for ease of demo
     const input = window.prompt('Enter your 4-digit security PIN to confirm:');
     if (input === savedPin) return true;
     
@@ -160,9 +166,14 @@ const App: React.FC = () => {
   };
 
   // Handlers
-  const addLoan = (loan: Omit<Loan, 'id'>) => {
+  const addLoan = (loan: Omit<Loan, 'id' | 'providerId' | 'takerId'>) => {
     if (!verifySecurityAction()) return;
-    const newLoan = { ...loan, id: Date.now().toString() };
+    const newLoan: Loan = { 
+      ...loan, 
+      id: Date.now().toString(),
+      providerId: currentUser?.id || 'prov-unknown',
+      takerId: `tak-${Date.now()}` // Mocking taker assignment
+    };
     setLoans([...loans, newLoan]);
     setActiveTab('dashboard');
   };
@@ -171,7 +182,6 @@ const App: React.FC = () => {
     const newPayment = { ...payment, id: Date.now().toString() };
     setPayments([...payments, newPayment]);
     
-    // Auto-complete logic
     const loan = loans.find(l => l.id === payment.loanId);
     if (loan && payment.type === 'Principal') {
         const principalPaid = payments.filter(p => p.loanId === loan.id && p.type === 'Principal').reduce((acc, p) => acc + p.amount, 0) + payment.amount;
@@ -196,31 +206,73 @@ const App: React.FC = () => {
     setActiveTab('loan-details');
   };
 
-  if (!isAuthenticated) {
+  if (!currentUser) {
     return (
-      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-        <Lock size={48} color="var(--primary-navy)" style={{ marginBottom: '20px' }} />
-        <h1 style={{ marginBottom: '8px' }}>App Locked</h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Enter PIN to access your portfolio</p>
-        <form onSubmit={handleLogin} style={{ width: '100%' }}>
-          <input 
-            type="password" 
-            placeholder="****" 
-            value={pinInput}
-            onChange={(e) => setPinInput(e.target.value)}
-            style={{ textAlign: 'center', letterSpacing: '8px', fontSize: '24px', marginBottom: '20px' }}
-          />
-          <button type="submit" className="btn btn-primary">Unlock</button>
-        </form>
+      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '20px', background: 'var(--primary-navy)', color: 'white' }}>
+        <ShieldAlert size={64} style={{ marginBottom: '20px', color: 'var(--accent-green)' }} />
+        <h1 style={{ marginBottom: '8px', color: 'white' }}>LoanManager Pro</h1>
+        <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '40px', textAlign: 'center' }}>Select your role to access the system</p>
+        
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <button onClick={() => mockLogin('ADMIN')} className="btn" style={{ background: 'white', color: 'var(--primary-navy)' }}>
+            <ShieldAlert size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Login as Admin
+          </button>
+          <button onClick={() => mockLogin('PROVIDER')} className="btn" style={{ background: 'white', color: 'var(--primary-navy)' }}>
+            <Wallet size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Login as Provider
+          </button>
+          <button onClick={() => mockLogin('TAKER')} className="btn" style={{ background: 'white', color: 'var(--primary-navy)' }}>
+            <UserCheck size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Login as Taker
+          </button>
+        </div>
       </div>
     );
   }
 
-  const renderDashboard = () => (
+  const renderAdminDashboard = () => (
+    <div className="screen">
+      <div className="header">
+        <h1>Admin Control</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>System Overview</p>
+      </div>
+
+      <div className="stats-grid">
+        <div className="card" style={{ background: 'var(--primary-navy)', color: 'white' }}>
+          <p className="card-title" style={{ color: 'rgba(255,255,255,0.7)' }}>Total Money in System</p>
+          <p className="card-value" style={{ color: 'white' }}>₹{(loans.filter(l => l.status !== 'Completed').reduce((acc, l) => acc + l.amount, 0)/1000).toFixed(1)}k</p>
+        </div>
+        <div className="card">
+          <p className="card-title">Total Users</p>
+          <p className="card-value" style={{ color: 'var(--accent-green)' }}>3</p>
+        </div>
+      </div>
+
+      <h3>System Actions</h3>
+      <div className="card">
+        <div className="list-item">
+          <div className="item-icon"><Users size={20} /></div>
+          <div className="item-info">
+            <p className="item-name">Manage Users</p>
+            <p className="item-subtitle">Approve or Reject KYC</p>
+          </div>
+          <ChevronRight size={20} color="#ccc" />
+        </div>
+        <div className="list-item">
+          <div className="item-icon"><BarChart3 size={20} /></div>
+          <div className="item-info">
+            <p className="item-name">Platform Analytics</p>
+            <p className="item-subtitle">View global profit charts</p>
+          </div>
+          <ChevronRight size={20} color="#ccc" />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProviderDashboard = () => (
     <div className="screen">
       <div className="header">
         <h1>Dashboard</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Private Lender Portfolio</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Welcome, {currentUser.name}</p>
       </div>
 
       <div className="stats-grid">
@@ -243,16 +295,16 @@ const App: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0 10px' }}>
-        <h3 style={{ margin: 0 }}>Recent Loans</h3>
+        <h3 style={{ margin: 0 }}>Recent Loans Given</h3>
         <button className="btn" style={{ width: 'auto', padding: '4px 8px', fontSize: '12px', background: 'transparent', color: 'var(--primary-navy)' }} onClick={() => setActiveTab('loans')}>View All</button>
       </div>
 
-      {loans.length === 0 ? (
+      {contextualLoans.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
           <p>No loans yet. Tap + to add one.</p>
         </div>
       ) : (
-        loans.slice(0, 5).map(loan => (
+        contextualLoans.slice(0, 5).map(loan => (
           <div key={loan.id} className="card" style={{ padding: '12px', cursor: 'pointer', borderLeft: loan.status === 'Defaulter' ? '4px solid var(--accent-red)' : '' }} onClick={() => { setSelectedLoanId(loan.id); setActiveTab('loan-details'); }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -273,6 +325,55 @@ const App: React.FC = () => {
       </button>
     </div>
   );
+
+  const renderTakerDashboard = () => (
+    <div className="screen">
+      <div className="header">
+        <h1>My Loans</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Welcome, {currentUser.name}</p>
+      </div>
+
+      <div className="card" style={{ background: 'var(--accent-orange)', color: 'white' }}>
+        <p style={{ opacity: 0.8, fontSize: '14px' }}>Total Borrowed</p>
+        <p style={{ fontSize: '32px', fontWeight: '800', margin: '4px 0' }}>₹{totalGiven.toLocaleString()}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '16px' }}>
+          <div>
+            <p style={{ opacity: 0.8, fontSize: '12px' }}>Total Unpaid Interest</p>
+            <p style={{ fontWeight: '600' }}>₹{contextualLoans.reduce((acc, l) => acc + getLoanStats(l).unpaidInterest, 0).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>Active Borrowings</h3>
+      {contextualLoans.filter(l => l.status !== 'Completed').map(loan => {
+        const stats = getLoanStats(loan);
+        return (
+          <div key={loan.id} className="card" style={{ cursor: 'pointer' }} onClick={() => { setSelectedLoanId(loan.id); setActiveTab('loan-details'); }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span className={`badge badge-${loan.status.toLowerCase()}`}>{loan.status}</span>
+              <p className="item-subtitle">Lender: Pro-Fin</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <p className="item-name">Principal: ₹{stats.remainingPrincipal.toLocaleString()}</p>
+                <p className="item-subtitle">Interest Due: ₹{stats.unpaidInterest.toLocaleString()}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p className="amount-main">Total Owed</p>
+                <p className="amount-sub" style={{ color: 'var(--accent-red)' }}>₹{stats.totalOutstanding.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderDashboard = () => {
+    if (currentUser.role === 'ADMIN') return renderAdminDashboard();
+    if (currentUser.role === 'TAKER') return renderTakerDashboard();
+    return renderProviderDashboard();
+  };
 
   const renderLoansList = () => {
     const filteredLoans = loans.filter(l => 
