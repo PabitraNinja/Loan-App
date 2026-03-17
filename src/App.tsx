@@ -138,6 +138,7 @@ const App: React.FC = () => {
   // Calculate real-time profit (Total Accrued - Interest Payments) is not right for dashboard.
   // Dashboard Profit = Current Accrued Interest on all active loans
   const totalAccruedProfit = activeLoans.reduce((acc, l) => acc + getAccruedInterest(l), 0);
+  const monthlyProfit = activeLoans.reduce((acc, l) => acc + (l.amount * l.rate / 100), 0);
   const totalInterestPaid = payments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
   
   const activeCount = loans.filter(l => l.status === 'Active').length;
