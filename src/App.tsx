@@ -92,11 +92,53 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Interest Calculation Engine
+  const getAccruedInterest = (loan: Loan) => {
+    const start = new Date(loan.startDate);
+    const today = new Date();
+    const diffTime = Math.max(0, today.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Pro-rata interest based on monthly rate (30 days = 1 month)
+    const monthlyRate = loan.rate / 100;
+    const dailyRate = monthlyRate / 30;
+    
+    let accrued = 0;
+    if (loan.type === 'Simple') {
+      accrued = loan.amount * dailyRate * diffDays;
+    } else {
+      // Compound Interest (Daily compounding simulation)
+      accrued = loan.amount * (Math.pow(1 + dailyRate, diffDays) - 1);
+    }
+    return Math.round(accrued);
+  };
+
+  const getLoanStats = (loan: Loan) => {
+    const loanPayments = payments.filter(p => p.loanId === loan.id);
+    const principalPaid = loanPayments.filter(p => p.type === 'Principal').reduce((acc, p) => acc + p.amount, 0);
+    const interestPaid = loanPayments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
+    
+    const accruedInterest = getAccruedInterest(loan);
+    const unpaidInterest = Math.max(0, accruedInterest - interestPaid);
+    const remainingPrincipal = Math.max(0, loan.amount - principalPaid);
+    
+    return {
+      remainingPrincipal,
+      accruedInterest,
+      unpaidInterest,
+      interestPaid,
+      totalOutstanding: remainingPrincipal + unpaidInterest
+    };
+  };
+
   // Derived Stats
   const activeLoans = loans.filter(l => l.status !== 'Completed');
   const totalGiven = activeLoans.reduce((acc, l) => acc + l.amount, 0);
-  const monthlyProfit = activeLoans.reduce((acc, l) => acc + (l.amount * l.rate / 100), 0);
-  const totalInterestEarned = payments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
+  
+  // Calculate real-time profit (Total Accrued - Interest Payments) is not right for dashboard.
+  // Dashboard Profit = Current Accrued Interest on all active loans
+  const totalAccruedProfit = activeLoans.reduce((acc, l) => acc + getAccruedInterest(l), 0);
+  const totalInterestPaid = payments.filter(p => p.type === 'Interest').reduce((acc, p) => acc + p.amount, 0);
   
   const activeCount = loans.filter(l => l.status === 'Active').length;
   const overdueCount = loans.filter(l => l.status === 'Overdue' || l.status === 'Defaulter').length;
