@@ -100,6 +100,14 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const setupPin = () => {
+    const newPin = window.prompt('Enter a 4-digit PIN to lock sensitive actions:');
+    if (newPin && newPin.length >= 4) {
+      localStorage.setItem('appPin', newPin);
+      alert('Security PIN updated successfully.');
+    }
+  };
+
   // Interest Calculation Engine
   const getAccruedInterest = (loan: Loan) => {
     const start = new Date(loan.startDate);
@@ -320,9 +328,11 @@ const App: React.FC = () => {
         ))
       )}
 
-      <button className="fab" onClick={() => setActiveTab('add-loan')}>
-        <Plus size={28} />
-      </button>
+      {currentUser.role === 'PROVIDER' && (
+        <button className="fab" onClick={() => setActiveTab('add-loan')}>
+          <Plus size={28} />
+        </button>
+      )}
     </div>
   );
 
@@ -384,13 +394,13 @@ const App: React.FC = () => {
     return (
       <div className="screen">
         <div className="header">
-          <h1>All Loans</h1>
+          <h1>{currentUser.role === 'TAKER' ? 'My Borrowings' : 'All Loans'}</h1>
           <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
               <input 
                 type="text" 
-                placeholder="Search borrowers..." 
+                placeholder="Search..." 
                 style={{ paddingLeft: '36px' }}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -446,12 +456,14 @@ const App: React.FC = () => {
              <ChevronRight style={{ transform: 'rotate(180deg)' }} />
           </button>
           <h1>Loan Details</h1>
-          <button 
-            onClick={() => deleteLoan(loan.id)} 
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer' }}
-          >
-            <Trash2 size={20} />
-          </button>
+          {currentUser.role === 'PROVIDER' && (
+            <button 
+              onClick={() => deleteLoan(loan.id)} 
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer' }}
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
         </div>
 
         <div className="card" style={{ background: 'var(--primary-navy)', color: 'white' }}>
@@ -482,7 +494,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {loan.status !== 'Completed' && (
+        {loan.status !== 'Completed' && currentUser.role === 'PROVIDER' && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             {loan.status !== 'Defaulter' && (
               <button className="btn" style={{ flex: 1, padding: '8px', fontSize: '12px', background: '#ffebee', color: 'var(--accent-red)' }} onClick={() => markStatus(loan.id, 'Defaulter')}>Mark Defaulter</button>
@@ -533,7 +545,9 @@ const App: React.FC = () => {
 
         {loan.status !== 'Completed' && (
           <div style={{ display: 'flex', marginTop: '12px' }}>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setActiveTab('add-payment')}>Add Payment</button>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setActiveTab('add-payment')}>
+              {currentUser.role === 'TAKER' ? 'Make Payment' : 'Add Payment'}
+            </button>
           </div>
         )}
       </div>
@@ -633,7 +647,7 @@ const App: React.FC = () => {
     return (
       <div className="screen">
         <div className="header">
-          <h1>Add Payment</h1>
+          <h1>{currentUser.role === 'TAKER' ? 'Make Payment' : 'Add Payment'}</h1>
           <p style={{ color: 'var(--text-muted)' }}>For {loan.name}</p>
         </div>
         <form onSubmit={handleSubmit} className="card">
@@ -656,7 +670,7 @@ const App: React.FC = () => {
             <label>Notes</label>
             <textarea name="notes" rows={2} placeholder="Optional notes..."></textarea>
           </div>
-          <button type="submit" className="btn btn-primary">Save Payment</button>
+          <button type="submit" className="btn btn-primary">{currentUser.role === 'TAKER' ? 'Submit Payment' : 'Save Payment'}</button>
           <button type="button" className="btn" style={{ marginTop: '8px', background: 'transparent' }} onClick={() => setActiveTab('loan-details')}>Cancel</button>
         </form>
       </div>
@@ -685,17 +699,17 @@ const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
            <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'var(--primary-navy)' }}></div>
            <p className="item-subtitle" style={{ flex: 1 }}>Active Loans</p>
-           <p className="amount-main">{loans.length > 0 ? Math.round((activeCount / loans.length) * 100) : 0}%</p>
+           <p className="amount-main">{contextualLoans.length > 0 ? Math.round((activeCount / contextualLoans.length) * 100) : 0}%</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
            <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'var(--accent-green)' }}></div>
            <p className="item-subtitle" style={{ flex: 1 }}>Completed</p>
-           <p className="amount-main">{loans.length > 0 ? Math.round((loans.filter(l => l.status === 'Completed').length / loans.length) * 100) : 0}%</p>
+           <p className="amount-main">{contextualLoans.length > 0 ? Math.round((contextualLoans.filter(l => l.status === 'Completed').length / contextualLoans.length) * 100) : 0}%</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
            <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'var(--accent-red)' }}></div>
            <p className="item-subtitle" style={{ flex: 1 }}>Overdue / Defaulter</p>
-           <p className="amount-main">{loans.length > 0 ? Math.round((overdueCount / loans.length) * 100) : 0}%</p>
+           <p className="amount-main">{contextualLoans.length > 0 ? Math.round((overdueCount / contextualLoans.length) * 100) : 0}%</p>
         </div>
       </div>
     </div>
@@ -723,9 +737,11 @@ const App: React.FC = () => {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <p className="amount-main" style={{ color: loan.status === 'Overdue' || loan.status === 'Defaulter' ? 'var(--accent-red)' : 'var(--text-main)' }}>₹{interestDue.toLocaleString()}</p>
-                <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: '12px', background: '#f0f2ff', color: 'var(--primary-navy)', marginTop: '4px' }}>
-                  <Bell size={12} style={{ marginRight: '4px' }} /> Remind
-                </button>
+                {currentUser.role === 'PROVIDER' && (
+                  <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: '12px', background: '#f0f2ff', color: 'var(--primary-navy)', marginTop: '4px' }}>
+                    <Bell size={12} style={{ marginRight: '4px' }} /> Remind
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -739,35 +755,64 @@ const App: React.FC = () => {
       <div className="header">
         <h1>Settings</h1>
       </div>
+      
+      <div className="card" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '24px', background: 'var(--primary-navy)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
+          {currentUser.name.charAt(0)}
+        </div>
+        <div>
+          <p className="item-name">{currentUser.name}</p>
+          <p className="item-subtitle">{currentUser.email} • {currentUser.role}</p>
+        </div>
+      </div>
+
       <div className="card">
-        <div className="list-item" onClick={setupPin} style={{ cursor: 'pointer' }}>
-          <div className="item-icon"><Lock size={20} /></div>
+        {currentUser.role !== 'TAKER' && (
+          <>
+            <div className="list-item" onClick={setupPin} style={{ cursor: 'pointer' }}>
+              <div className="item-icon"><Lock size={20} /></div>
+              <div className="item-info">
+                <p className="item-name">App Security</p>
+                <p className="item-subtitle">{localStorage.getItem('appPin') ? 'Update PIN code' : 'Setup App Lock PIN'}</p>
+              </div>
+              <ChevronRight size={20} color="#ccc" />
+            </div>
+            <div className="list-item" onClick={exportToCSV} style={{ cursor: 'pointer' }}>
+              <div className="item-icon"><Download size={20} /></div>
+              <div className="item-info">
+                <p className="item-name">Export to CSV</p>
+                <p className="item-subtitle">Download database report</p>
+              </div>
+              <ChevronRight size={20} color="#ccc" />
+            </div>
+          </>
+        )}
+        <div className="list-item" onClick={handleLogout} style={{ cursor: 'pointer', borderBottom: 'none' }}>
+          <div className="item-icon" style={{ background: '#ffeeee', color: 'var(--accent-red)' }}><UserCheck size={20} /></div>
           <div className="item-info">
-            <p className="item-name">App Security</p>
-            <p className="item-subtitle">{localStorage.getItem('appPin') ? 'Update PIN code' : 'Setup App Lock PIN'}</p>
-          </div>
-          <ChevronRight size={20} color="#ccc" />
-        </div>
-        <div className="list-item" onClick={exportToCSV} style={{ cursor: 'pointer' }}>
-          <div className="item-icon"><Download size={20} /></div>
-          <div className="item-info">
-            <p className="item-name">Export to CSV</p>
-            <p className="item-subtitle">Download database report</p>
-          </div>
-          <ChevronRight size={20} color="#ccc" />
-        </div>
-        <div className="list-item" onClick={() => { if(window.confirm('Wipe all data?')) { localStorage.clear(); window.location.reload(); } }} style={{ cursor: 'pointer' }}>
-          <div className="item-icon" style={{ background: '#ffeeee', color: 'var(--accent-red)' }}><Trash2 size={20} /></div>
-          <div className="item-info">
-            <p className="item-name" style={{ color: 'var(--accent-red)' }}>Reset Database</p>
-            <p className="item-subtitle">Clear all local storage</p>
+            <p className="item-name" style={{ color: 'var(--accent-red)' }}>Log Out</p>
+            <p className="item-subtitle">Switch account</p>
           </div>
           <ChevronRight size={20} color="#ccc" />
         </div>
       </div>
+      
+      {currentUser.role === 'ADMIN' && (
+        <div className="card" style={{ marginTop: '16px' }}>
+          <div className="list-item" onClick={() => { if(window.confirm('Wipe all data globally?')) { localStorage.clear(); window.location.reload(); } }} style={{ cursor: 'pointer', borderBottom: 'none' }}>
+            <div className="item-icon" style={{ background: '#ffeeee', color: 'var(--accent-red)' }}><Trash2 size={20} /></div>
+            <div className="item-info">
+              <p className="item-name" style={{ color: 'var(--accent-red)' }}>Factory Reset</p>
+              <p className="item-subtitle">Clear all system data</p>
+            </div>
+            <ChevronRight size={20} color="#ccc" />
+          </div>
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', marginTop: '40px' }}>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loan Tracker v1.1.0</p>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pro Edition</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>LoanManager Pro v2.0</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Multi-User Enterprise Edition</p>
       </div>
     </div>
   );
@@ -796,13 +841,15 @@ const App: React.FC = () => {
           <Bell size={24} />
           <span>Dues</span>
         </div>
-        <div className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
-          <BarChart3 size={24} />
-          <span>Reports</span>
-        </div>
+        {currentUser.role !== 'TAKER' && (
+          <div className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+            <BarChart3 size={24} />
+            <span>Reports</span>
+          </div>
+        )}
         <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
           <Settings size={24} />
-          <span>Setup</span>
+          <span>Account</span>
         </div>
       </nav>
     </div>
