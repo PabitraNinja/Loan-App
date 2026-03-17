@@ -217,7 +217,7 @@ const App: React.FC = () => {
         </div>
         <div className="card">
           <p className="card-title">Interest Earned</p>
-          <p className="card-value">₹{totalInterestEarned.toLocaleString()}</p>
+          <p className="card-value">₹{totalInterestPaid.toLocaleString()}</p>
         </div>
         <div className="card">
           <p className="card-title">Overdue/Defaulters</p>
@@ -554,7 +554,7 @@ const App: React.FC = () => {
       <div className="stats-grid">
         <div className="card">
           <p className="card-title">Interest Earned (Total)</p>
-          <p className="card-value" style={{ color: 'var(--accent-green)' }}>₹{(totalInterestEarned / 1000).toFixed(1)}k</p>
+          <p className="card-value" style={{ color: 'var(--accent-green)' }}>₹{(totalInterestPaid / 1000).toFixed(1)}k</p>
         </div>
         <div className="card">
           <p className="card-title">Principal Recovered</p>
